@@ -1,0 +1,129 @@
+package JsonEx.resteasyClient;
+
+import java.io.IOException;
+import java.security.SecureRandom;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.StatusLine;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.HttpResponseException;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.conn.scheme.PlainSocketFactory;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
+import org.apache.http.conn.ssl.SSLSocketFactory;
+import org.apache.http.conn.ssl.X509HostnameVerifier;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.conn.PoolingClientConnectionManager;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.util.EntityUtils;
+import org.json.JSONObject;
+
+
+public class VNPTPaymentGtw {
+	public static void main(String[] args) {
+
+		try{
+			SSLContext sslContext = SSLContext.getInstance("SSL");
+			
+			 TrustManager[] trustAllCerts = new TrustManager[] {
+				       new X509TrustManager() {
+				    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+				        return null;
+				    }
+				    public void checkClientTrusted(X509Certificate[] certs, String authType) {  }
+
+				    public void checkServerTrusted(X509Certificate[] certs, String authType) {  }
+				    }
+				    };
+			
+			
+			sslContext.init(null, trustAllCerts, new SecureRandom());
+			
+			SSLSocketFactory socketFactory = new SSLSocketFactory(sslContext, new X509HostnameVerifier() {
+				@Override
+				public boolean verify(String hostname, SSLSession session) {
+					return true;
+				}
+				@Override
+				public void verify(String arg0, String[] arg1, String[] arg2) throws SSLException { }
+				@Override
+				public void verify(String arg0, X509Certificate arg1) throws SSLException { }
+				@Override
+				public void verify(String arg0, SSLSocket arg1) throws IOException { }
+			});
+			
+			Scheme httpsschema = new Scheme("https", 443, socketFactory);
+			Scheme httpschema = new Scheme("https", 80, PlainSocketFactory.getSocketFactory());
+			
+			SchemeRegistry schemeRegistry = new SchemeRegistry();
+		    schemeRegistry.register(httpschema);
+		    schemeRegistry.register(httpsschema);
+		    
+		    PoolingClientConnectionManager cm = new PoolingClientConnectionManager(schemeRegistry);
+		    cm.setMaxTotal(10);
+		    cm.setDefaultMaxPerRoute(200);
+			
+			HttpClient httpClient = new DefaultHttpClient(cm);
+			httpClient.getParams().setParameter(HttpConnectionParams.CONNECTION_TIMEOUT, 3000);
+			
+			HttpPost postRequest = new HttpPost("https://sandbox.vnptpay.vn/rest/payment/v1.0.5/init");
+				postRequest.setHeader("accept", ContentType.APPLICATION_JSON.getMimeType());
+				postRequest.setHeader("Authorization", "Bearer acf392daf78c3cbeeb9705dab9a63212");
+				postRequest.setHeader("content-type",ContentType.APPLICATION_JSON.getMimeType());
+				
+				
+			JSONObject requestJSON = new JSONObject();
+			requestJSON.put("ACTION","INIT");
+			requestJSON.put("VERSION","1.0.5");
+			requestJSON.put("MERCHANT_SERVICE_ID","636");
+			requestJSON.put("MERCHANT_ORDER_ID","0000001");
+			requestJSON.put("AMOUNT","50000");
+			requestJSON.put("AMOUNT_DETAIL","50000");
+			requestJSON.put("SERVICE_ID","1");
+			requestJSON.put("DEVICE","1");
+			requestJSON.put("LOCALE","vi-VN");
+			requestJSON.put("CURRENCY_CODE","VND");
+			requestJSON.put("PAYMENT_METHOD","VNPTPAY");
+			requestJSON.put("DESCRIPTION","Thanh toan don hang");
+			requestJSON.put("CREATE_DATE","20190418000000");
+			requestJSON.put("CLIENT_IP","123.34.45.106");
+			requestJSON.put("SECURE_CODE","e1fcf675e3b456d8e12685010c290f07e2c88d85f289c9906c4fb8d0cfd00df2");
+			StringEntity strEntity = new StringEntity(requestJSON.toString(), ContentType.APPLICATION_JSON);
+			postRequest.setEntity(strEntity);
+			
+			HttpResponse httpResponse = httpClient.execute(postRequest);
+			StatusLine statusLine = httpResponse.getStatusLine();
+			HttpEntity entity = httpResponse.getEntity();
+			if(entity == null){
+				EntityUtils.consume(entity);
+				throw new HttpResponseException(statusLine.getStatusCode(),"Error while parsing Web-Service response, Reason: response Body is null");
+			}
+			
+			if (statusLine.getStatusCode() >= 300 || statusLine.getStatusCode() < 200) {
+	            EntityUtils.consume(entity);
+	            System.out.println("Code : "+ statusLine.getStatusCode() );
+	            System.out.println("Reason : "+ statusLine.getReasonPhrase() );
+	            throw new HttpResponseException(statusLine.getStatusCode(),statusLine.getReasonPhrase());
+	        }
+			
+			System.out.println("Response : "  + EntityUtils.toString(entity));
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+}
